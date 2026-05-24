@@ -1,0 +1,95 @@
+"Notes","State","State Code",Deaths,Population,Crude Rate
+,"Alabama","01",15703,23347770,67.3
+,"Alaska","02",1199,3408898,35.2
+,"Arizona","04",13405,30659415,43.7
+,"Arkansas","05",10648,14222905,74.9
+,"California","06",65924,181665022,36.3
+,"Colorado","08",7912,24018104,32.9
+,"Connecticut","09",8984,17659072,50.9
+,"Delaware","10",2778,4351771,63.8
+,"District of Columbia","11",1362,2884685,47.2
+,"Florida","12",59734,91556819,65.2
+,"Georgia","13",22137,46557412,47.5
+,"Hawaii","15",2784,6597065,42.2
+,"Idaho","16",3074,7490774,41.0
+,"Illinois","17",33656,63493540,53.0
+,"Indiana","18",20284,31875015,63.6
+,"Iowa","19",8952,14995914,59.7
+,"Kansas","20",7866,13932795,56.5
+,"Kentucky","21",16893,21265605,79.4
+,"Louisiana","22",13552,22182108,61.1
+,"Maine","23",4674,6629545,70.5
+,"Maryland","24",14423,28288507,51.0
+,"Massachusetts","25",18104,32231513,56.2
+,"Michigan","26",29445,49936982,59.0
+,"Minnesota","27",11890,26018577,45.7
+,"Mississippi","28",9745,14645851,66.5
+,"Missouri","29",19475,29405620,66.2
+,"Montana","30",2658,4817897,55.2
+,"Nebraska","31",4521,8926691,50.6
+,"Nevada","32",6548,12894168,50.8
+,"New Hampshire","33",3620,6551429,55.3
+,"New Jersey","34",21721,43458230,50.0
+,"New Mexico","35",3640,9931945,36.6
+,"New York","36",46087,95889078,48.1
+,"North Carolina","37",26751,45499729,58.8
+,"North Dakota","38",1612,3270870,49.3
+,"Ohio","39",37167,57489288,64.7
+,"Oklahoma","40",12142,18163584,66.8
+,"Oregon","41",10407,18583850,56.0
+,"Pennsylvania","42",39787,62803879,63.4
+,"Rhode Island","44",3179,5296976,60.0
+,"South Carolina","45",13665,22190975,61.6
+,"South Dakota","46",2160,3956340,54.6
+,"Tennessee","47",21775,30808980,70.7
+,"Texas","48",48272,119080486,40.5
+,"Utah","49",2110,12967422,16.3
+,"Vermont","50",1843,3116556,59.1
+,"Virginia","51",20256,38761263,52.3
+,"Washington","53",15761,32319302,48.8
+,"West Virginia","54",7621,9170541,83.1
+,"Wisconsin","55",14427,28044856,51.4
+,"Wyoming","56",1197,2677594,44.7
+"Total",,,793530,1505993213,52.7
+"---"
+"Dataset: Compressed Mortality, 1999-2016"
+"Query Parameters:"
+"Title: Lung Cancer Deaths"
+"ICD-10 Codes: C33 (Malignant neoplasm of trachea); C34.0 (Main bronchus - Malignant neoplasms); C34.1 (Upper lobe, bronchus or"
+"lung - Malignant neoplasms); C34.2 (Middle lobe, bronchus or lung - Malignant neoplasms); C34.3 (Lower lobe, bronchus or lung -"
+"Malignant neoplasms); C34.8 (Overlapping lesion of bronchus and lung - Malignant neoplasms); C34.9 (Bronchus or lung,"
+"unspecified - Malignant neoplasms)"
+"Year: 2005; 2006; 2007; 2008; 2009"
+"Group By: State"
+"Show Totals: True"
+"Show Zero Values: False"
+"Show Suppressed: False"
+"Calculate Rates Per: 100,000"
+"---"
+"Help: See http://wonder.cdc.gov/wonder/help/cmf.html for more information."
+"---"
+"Query Date: Apr 17, 2026 12:48:57 PM"
+"---"
+"Suggested Citation: Centers for Disease Control and Prevention, National Center for Health Statistics. National Vital Statistics"
+"System, Mortality: Compressed Mortality File 1999-2016 on CDC WONDER Online Database, released June 2017. Data are from the"
+"Compressed Mortality File 1999-2016 Series 20 No. 2U, 2016, as compiled from data provided by the 57 vital statistics"
+"jurisdictions through the Vital Statistics Cooperative Program. Accessed at http://wonder.cdc.gov/cmf-icd10.html on Apr 17, 2026"
+"12:48:57 PM"
+"---"
+Caveats:
+"1. About population figures for regions, divisions, states and counties: population figures for 1999 are from the 1990-1999"
+"series of bridged-race intercensal estimates of the July 1 resident population; population figures for 2000 and 2010 are"
+"bridged-race April 1 census counts; population figures for 2001-2009 are from the revised 2000-2009 series of bridged-race"
+"intercensal estimates of the July 1 resident population; and population figures for 2011-2015 are bridged-race postcensal"
+"estimates of the July 1 resident population, from the Vintage 2015 series released by NCHS on June 28, 2016."
+"2. The population figures used in the calculation of death rates for the age group 'under 1 year' are the estimates of the"
+"resident population that is under one year of age. More information: http://wonder.cdc.gov/wonder/help/cmf.html#Age Group."
+"3. Changes to cause of death classification affect reporting trends. More information:"
+"http://wonder.cdc.gov/wonder/help/cmf.html#ICD-10 Changes."
+"4. Circumstances in Georgia for the years 2008-2009 have resulted in unusually high death counts for the ICD-10 cause of death"
+"code R99, ""Other ill-defined and unspecified causes of mortality."" Caution should be used in interpreting these data. More"
+"information: http://wonder.cdc.gov/wonder/help/cmf.html#Georgia-Reporting-Anomalies."
+"5. Circumstances in New Jersey for the year 2009 have resulted in unusually high death counts for the ICD-10 cause of death code"
+"R99, ""Other ill-defined and unspecified causes of mortality"" and therefore unusually low death counts in other ICD-10 codes,"
+"most notably R95, ""Sudden Infant Death Syndrome"" and X40-X49, ""Unintentional poisoning."" Caution should be used in"
+"interpreting these data. More information: http://wonder.cdc.gov/wonder/help/cmf.html#New-Jersey-Reporting-Anomalies."
