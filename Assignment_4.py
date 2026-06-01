@@ -486,19 +486,25 @@ number_of_states = st.sidebar.slider(
     value=10
 )
 
+# Initialize Session States - Now starting completely empty
 if "selected_states" not in st.session_state:
-    st.session_state["selected_states"] = (
-        final.sort_values("Mean_State_Revenue", ascending=False)["LocationAbbr"]
-        .head(6)
-        .tolist()
-    )
+    st.session_state["selected_states"] = []
+    st.session_state["multiselect_states"] = []
 
 if "map_key" not in st.session_state:
     st.session_state["map_key"] = 0
 
+# Callbacks for precise state syncing
+def update_from_multiselect():
+    # Sync the master list to whatever the user selected in the dropdown
+    st.session_state["selected_states"] = st.session_state["multiselect_states"].copy()
+    # Reset the map to break any Plotly selection locks
+    st.session_state["map_key"] += 1
 
 def clear_selection():
+    # Empty both the master list and the dropdown list
     st.session_state["selected_states"] = []
+    st.session_state["multiselect_states"] = []
     st.session_state["map_key"] += 1
 
 
@@ -510,11 +516,10 @@ def clear_selection():
 # In[ ]:
 
 
-tab_map, tab_bar, tab_scatter, tab_heatmap, tab_data = st.tabs(
+tab_map, tab_bar, tab_heatmap, tab_data = st.tabs(
     [
-        "🗺️ Map",
+        "🗺️ Map & Scatter Plot",
         "📊 Bar Chart",
-        "🔍 Scatter Plot",
         "🌡️ Correlation Heatmap",
         "📄 Data Tables"
     ]
@@ -528,10 +533,16 @@ with tab_map:
     st.header("National Overview Map")
     st.markdown(
         "This map shows how the selected metric varies geographically across U.S. states. "
-        "Click a state on the map to add it to the scatter plot comparison."
+        "Click a state on the map to add or remove it from the scatter plot comparison below."
     )
 
     selected_map_col = METRIC_MAPPING[map_metric_name]
+
+    # Find the data indices of the currently selected states to highlight them on the map
+    selected_indices = [
+        i for i, abbr in enumerate(final["LocationAbbr"]) 
+        if abbr in st.session_state["selected_states"]
+    ]
 
     fig_map = go.Figure(
         data=go.Choropleth(
@@ -541,7 +552,10 @@ with tab_map:
             locationmode="USA-states",
             colorscale="Viridis",
             colorbar_title=map_metric_name,
-            hovertemplate="<b>%{text}</b><br>Value: %{z:,.2f}<extra></extra>"
+            hovertemplate="<b>%{text}</b><br>Value: %{z:,.2f}<extra></extra>",
+            # If there are selections, highlight them. Otherwise, pass None to show full map normally.
+            selectedpoints=selected_indices if selected_indices else None,
+            unselected=dict(marker=dict(opacity=0.3)) # Dims unselected states for clarity
         )
     )
 
@@ -569,18 +583,122 @@ with tab_map:
         key=f"map_{st.session_state['map_key']}"
     )
 
-    state_added = False
-
+    # Handle map clicks and sync to the multiselect
     if map_event and "selection" in map_event and "points" in map_event["selection"]:
+        state_changed = False
+        current_selection = set(st.session_state["selected_states"])
+        
         for point in map_event["selection"]["points"]:
             state_clicked = point.get("location")
+            if state_clicked:
+                if state_clicked in current_selection:
+                    current_selection.remove(state_clicked)
+                else:
+                    current_selection.add(state_clicked)
+                state_changed = True
 
-            if state_clicked and state_clicked not in st.session_state["selected_states"]:
-                st.session_state["selected_states"].append(state_clicked)
-                state_added = True
+        if state_changed:
+            new_list = list(current_selection)
+            st.session_state["selected_states"] = new_list
+            st.session_state["multiselect_states"] = new_list  # Sync multiselect
+            st.session_state["map_key"] += 1                   # Reset map state
+            st.rerun()
 
-    if state_added:
-        st.rerun()
+    # --- Scatter Plot ---
+    st.write("---")
+    st.header("State Comparison and Correlation")
+    st.markdown(
+        "This scatter plot compares two selected metrics for the chosen states. "
+        "Choose at least two states and two different metrics."
+    )
+
+    col_select, col_clear = st.columns([4, 1])
+
+    with col_select:
+        st.multiselect(
+            "Select states to analyze:",
+            options=state_options,
+            key="multiselect_states",  # Tied to the dedicated multiselect session state
+            on_change=update_from_multiselect, # Trigger sync when changed manually
+            format_func=lambda abbr: f"{state_name_map.get(abbr, abbr)} ({abbr})"
+        )
+
+    with col_clear:
+        st.write("")
+        st.write("")
+        st.button("Clear States", on_click=clear_selection)
+
+    col_x, col_y = st.columns(2)
+
+    with col_x:
+        x_metric_name = st.selectbox(
+            "Select X-axis metric:",
+            options=list(METRIC_MAPPING.keys()),
+            index=0
+        )
+
+    with col_y:
+        y_metric_name = st.selectbox(
+            "Select Y-axis metric:",
+            options=list(METRIC_MAPPING.keys()),
+            index=1
+        )
+
+    x_col = METRIC_MAPPING[x_metric_name]
+    y_col = METRIC_MAPPING[y_metric_name]
+
+    # Use the master session state for the dataframe filter
+    df_selected = final[final["LocationAbbr"].isin(st.session_state["selected_states"])].copy()
+
+    if x_col == y_col:
+        st.info("Please select two different metrics for the X-axis and Y-axis.")
+
+    elif len(df_selected) < 2:
+        st.info("Please select at least two states to view the scatter plot and regression line.")
+
+    else:
+        correlation = df_selected[x_col].corr(df_selected[y_col])
+        st.write(f"**Pearson correlation for selected states:** {correlation:.3f}")
+
+        try:
+            fig_scatter = px.scatter(
+                df_selected,
+                x=x_col,
+                y=y_col,
+                text="LocationAbbr",
+                hover_name="LocationDesc",
+                trendline="ols",
+                title=f"{y_metric_name} vs. {x_metric_name}",
+                labels={x_col: x_metric_name, y_col: y_metric_name}
+            )
+        except ImportError:
+            # specifically catch the missing statsmodels to prevent masking other critical errors
+            fig_scatter = px.scatter(
+                df_selected,
+                x=x_col,
+                y=y_col,
+                text="LocationAbbr",
+                hover_name="LocationDesc",
+                title=f"{y_metric_name} vs. {x_metric_name}",
+                labels={x_col: x_metric_name, y_col: y_metric_name}
+            )
+            st.info("Install statsmodels if you want the trendline: python3 -m pip install statsmodels")
+
+        fig_scatter.update_traces(
+            marker=dict(size=11, color="#2563EB", line=dict(width=1, color="white")),
+            textposition="top center"
+        )
+
+        fig_scatter.update_layout(
+            template="plotly_white",
+            paper_bgcolor="white",
+            plot_bgcolor="white",
+            font=dict(color="#0F172A"),
+            title_font=dict(size=22, color="#0F172A"),
+            margin=dict(l=20, r=20, t=60, b=20)
+        )
+
+        st.plotly_chart(fig_scatter, width="stretch")
 
 
 # In[ ]:
@@ -641,117 +759,6 @@ with tab_bar:
     )
 
     st.plotly_chart(fig_bar, width="stretch", theme=None)
-
-
-# In[ ]:
-
-
-with tab_scatter:
-    st.header("State Comparison and Correlation")
-    st.markdown(
-        "This scatter plot compares two selected metrics for the chosen states. "
-        "Choose at least two states and two different metrics."
-    )
-
-    col_select, col_clear = st.columns([4, 1])
-
-    # Remove old invalid selections if the app was changed from full state names to abbreviations.
-    st.session_state["selected_states"] = [
-        state for state in st.session_state["selected_states"]
-        if state in state_options
-    ]
-
-    with col_select:
-        st.multiselect(
-            "Select states to analyze:",
-            options=state_options,
-            key="selected_states",
-            format_func=lambda abbr: f"{state_name_map.get(abbr, abbr)} ({abbr})"
-        )
-
-    with col_clear:
-        st.write("")
-        st.write("")
-        st.button("Clear States", on_click=clear_selection)
-
-    col_x, col_y = st.columns(2)
-
-    with col_x:
-        x_metric_name = st.selectbox(
-            "Select X-axis metric:",
-            options=list(METRIC_MAPPING.keys()),
-            index=0
-        )
-
-    with col_y:
-        y_metric_name = st.selectbox(
-            "Select Y-axis metric:",
-            options=list(METRIC_MAPPING.keys()),
-            index=1
-        )
-
-    x_col = METRIC_MAPPING[x_metric_name]
-    y_col = METRIC_MAPPING[y_metric_name]
-
-    df_selected = final[final["LocationAbbr"].isin(st.session_state["selected_states"])].copy()
-
-    if x_col == y_col:
-        st.info("Please select two different metrics for the X-axis and Y-axis.")
-
-    elif len(df_selected) < 2:
-        st.info("Please select at least two states to view the scatter plot and regression line.")
-
-    else:
-        correlation = df_selected[x_col].corr(df_selected[y_col])
-        st.write(f"**Pearson correlation for selected states:** {correlation:.3f}")
-
-        try:
-            fig_scatter = px.scatter(
-                df_selected,
-                x=x_col,
-                y=y_col,
-                text="LocationAbbr",
-                hover_name="LocationDesc",
-                trendline="ols",
-                title=f"{y_metric_name} vs. {x_metric_name}",
-                labels={
-                    x_col: x_metric_name,
-                    y_col: y_metric_name
-                }
-            )
-        except Exception:
-            fig_scatter = px.scatter(
-                df_selected,
-                x=x_col,
-                y=y_col,
-                text="LocationAbbr",
-                hover_name="LocationDesc",
-                title=f"{y_metric_name} vs. {x_metric_name}",
-                labels={
-                    x_col: x_metric_name,
-                    y_col: y_metric_name
-                }
-            )
-            st.info("Install statsmodels if you want the trendline: python3 -m pip install statsmodels")
-
-            fig_scatter.update_traces(
-                marker=dict(size=11, color="#2563EB", line=dict(width=1, color="white")),
-                textposition="top center"
-            )
-
-            fig_scatter.update_layout(
-                template="plotly_white",
-                paper_bgcolor="white",
-                plot_bgcolor="white",
-                font=dict(color="#0F172A"),
-                title_font=dict(size=22, color="#0F172A"),
-                margin=dict(l=20, r=20, t=60, b=20)
-            )
-
-        st.plotly_chart(fig_scatter, width="stretch")
-
-
-# In[ ]:
 
 
 with tab_heatmap:
