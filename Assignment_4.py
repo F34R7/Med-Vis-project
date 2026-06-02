@@ -26,8 +26,11 @@
 # Run this notebook normally in Jupyter for review, or convert it to a Streamlit app with:
 # 
 # ```bash
-# python3 -m jupyter nbconvert --to script Assignment_4_reordered_clean.ipynb
-# streamlit run Assignment_4_reordered_clean.py
+# py -m jupyter nbconvert --to script Assignment_4.ipynb
+# ```
+# 
+# ```bash
+# streamlit run Assignment_4.py
 # ```
 # 
 # Install missing packages from Terminal, not inside the notebook:
@@ -37,7 +40,7 @@
 # ```
 # 
 
-# In[ ]:
+# In[51]:
 
 
 from pathlib import Path
@@ -55,7 +58,7 @@ st.set_page_config(
 )
 
 
-# In[ ]:
+# In[52]:
 
 
 st.markdown(
@@ -223,7 +226,7 @@ st.markdown(
 # All datasets are combined at the state level for the years 2005–2009.
 # 
 
-# In[ ]:
+# In[53]:
 
 
 # File paths
@@ -238,12 +241,16 @@ DATA_DIR = BASE_DIR / "data"
 REVENUE_FILE = "Table_of_Gross_Cigarette_Tax_Revenue_Per_State_(Orzechowski_and_Walker_Tax_Burden_on_Tobacco)_20260417.csv"
 CANCER_FILE = "Lung_Cancer_Deaths.csv"
 SAM_FILE = "Smoking-Attributable_Mortality,_Morbidity,_and_Economic_Costs_(SAMMEC)_-_Smoking-Attributable_Mortality_(SAM)_20260417.csv"
+COST_FILE = "The_Tax_Burden_on_Tobacco,_1970-2019_20260528.csv"
+INCOME_FILE = "tabn024.csv"
 
 revenue_path = DATA_DIR / REVENUE_FILE
 cancer_path = DATA_DIR / CANCER_FILE
 sam_path = DATA_DIR / SAM_FILE
+cost_path = DATA_DIR / COST_FILE
+income_path = DATA_DIR / INCOME_FILE
 
-missing_files = [str(path) for path in [revenue_path, cancer_path, sam_path] if not path.exists()]
+missing_files = [str(path) for path in [revenue_path, cancer_path, sam_path, cost_path, income_path] if not path.exists()]
 
 if missing_files:
     st.error("Some required CSV files are missing. Make sure the data folder is in the same folder as this notebook/script.")
@@ -256,12 +263,14 @@ if missing_files:
 # The datasets are loaded first, then cleaned separately so each transformation is easier to understand.
 # 
 
-# In[ ]:
+# In[54]:
 
 
 revenue_raw = pd.read_csv(revenue_path)
 cancer_raw = pd.read_csv(cancer_path)
 sam_raw = pd.read_csv(sam_path)
+cost_raw = pd.read_csv(cost_path)
+income_raw = pd.read_csv(income_path, sep=";")
 
 
 # ## 4. Clean cigarette tax revenue data
@@ -269,7 +278,7 @@ sam_raw = pd.read_csv(sam_path)
 # This section keeps the years 2005–2009, converts revenue values to numeric format, and calculates the mean cigarette tax revenue for each state.
 # 
 
-# In[ ]:
+# In[55]:
 
 
 revenue = revenue_raw.copy()
@@ -304,7 +313,7 @@ revenue_avg = (
 # This section keeps the overall population estimate and the average annual smoking-attributable mortality measure.
 # 
 
-# In[ ]:
+# In[56]:
 
 
 sam = sam_raw.copy()
@@ -344,7 +353,7 @@ sam_avg = sam_avg[["LocationAbbr", "Data_Value"]].rename(
 # This section keeps the state-level cancer death counts and aligns the state column name with the other datasets.
 # 
 
-# In[ ]:
+# In[57]:
 
 
 cancer = cancer_raw.copy()
@@ -362,12 +371,60 @@ cancer["Deaths"] = pd.to_numeric(
 cancer = cancer.rename(columns={"Deaths": "Average_Cancer_Deaths"})
 
 
-# ## 7. Merge final dataset and create derived metrics
+# ## 7. Clean cost per pack data
+# 
+# This section keeps state-level cost per pack and aligns the column name with other datasets
+# 
+
+# In[75]:
+
+
+cost_relevant = cost_raw[cost_raw["MeasureDesc"] == "Cigarette Sales"]
+
+cost_relevant = cost_relevant[(cost_relevant["Year"] >= 2005) &(cost_relevant["Year"] <= 2009)]
+
+cost_relevant["Data_Value"] = pd.to_numeric(
+    cost_relevant["Data_Value"].astype(str).str.replace(",", ".", regex=False),
+    errors="coerce"
+)
+
+
+cost_avg = (
+    cost_relevant
+    .groupby(["LocationAbbr", "LocationDesc"], as_index=False)["Data_Value"]
+    .mean()
+    .rename(columns={"Data_Value": "Mean_Pack_Cost"}))
+
+print(cost_avg)
+
+cost_avg = cost_avg[["LocationDesc", "Mean_Pack_Cost"]]
+
+
+# ## 8.Clean avarage income data
+# 
+# This section keeps state-level avarage income and aligns the column name with other datasets
+# 
+
+# In[59]:
+
+
+income_raw.columns = income_raw.columns.str.strip()
+year_cols = ["2005", "2006", "2007", "2008", "2009"]
+income_relevant = income_raw[["State", "2005", "2006", "2007", "2008", "2009"]]
+income_relevant[year_cols] = income_relevant[year_cols].replace(" ", "", regex=True)
+income_relevant[year_cols] = income_relevant[year_cols].apply(pd.to_numeric, errors="coerce")
+income_avg = income_relevant.copy()
+income_avg["Mean_Income"] = income_avg[year_cols].mean(axis=1)
+income_avg = income_avg.rename(columns={"State": "LocationDesc"})
+income_avg = income_avg[["LocationDesc","Mean_Income"]]
+
+
+# ## 9. Merge final dataset and create derived metrics
 # 
 # The final dataset combines all three cleaned datasets by state. New derived metrics are added so the dashboard can compare revenue and mortality in multiple ways.
 # 
 
-# In[ ]:
+# In[70]:
 
 
 final = pd.merge(
@@ -384,9 +441,25 @@ final = pd.merge(
     how="inner"
 )
 
+final = pd.merge(
+    final,
+    cost_avg,
+    on="LocationDesc",
+    how="inner"
+)
+
+final = pd.merge(
+    final,
+    income_avg,
+    on="LocationDesc",
+    how="inner"
+)
+
+
 final["Revenue_per_SAM"] = final["Mean_State_Revenue"] / final["Avg_Annual_SAM"]
 final["SAM_per_Cancer_Death"] = final["Avg_Annual_SAM"] / final["Average_Cancer_Deaths"]
 final["Revenue_per_Cancer_Death"] = final["Mean_State_Revenue"] / final["Average_Cancer_Deaths"]
+final["Cost_Relative_To_Income"] = final["Mean_Income"] / final["Mean_Pack_Cost"]
 
 # Keep only the columns needed for the dashboard first, while preserving extra cancer columns at the end if present.
 priority_columns = [
@@ -397,11 +470,17 @@ priority_columns = [
     "Average_Cancer_Deaths",
     "Revenue_per_SAM",
     "SAM_per_Cancer_Death",
-    "Revenue_per_Cancer_Death"
+    "Revenue_per_Cancer_Death",
+    "Mean_Pack_Cost",
+    "Mean_Income",
+    "Cost_Relative_To_Income"
 ]
+
+print(final.columns)
 
 remaining_columns = [col for col in final.columns if col not in priority_columns]
 final = final[priority_columns + remaining_columns]
+
 
 
 # ## 8. Dashboard overview
@@ -409,7 +488,7 @@ final = final[priority_columns + remaining_columns]
 # The dashboard starts with a short explanation and summary cards before showing visualizations. This keeps the story clear before showing detailed tables.
 # 
 
-# In[ ]:
+# In[61]:
 
 
 st.title("📊 Smoking, Tax Revenue, and Mortality Dashboard")
@@ -442,13 +521,15 @@ st.markdown(
 )
 
 
-# In[ ]:
+# In[62]:
 
 
 METRIC_MAPPING = {
     "Tax Revenue": "Mean_State_Revenue",
     "Smoking Mortality (SAM)": "Avg_Annual_SAM",
     "Lung/Respiratory Cancer Deaths": "Average_Cancer_Deaths",
+    "Cost per pack": "Mean_Pack_Cost",
+    "Pack's per average Income": "Cost_Relative_To_Income",
     "Revenue per SAM Death": "Revenue_per_SAM",
     "SAM per Cancer Death": "SAM_per_Cancer_Death",
     "Revenue per Cancer Death": "Revenue_per_Cancer_Death"
@@ -457,6 +538,8 @@ DISPLAY_LABELS = {
     "Mean_State_Revenue": "Tax Revenue",
     "Avg_Annual_SAM": "Smoking Mortality",
     "Average_Cancer_Deaths": "Cancer Deaths",
+    "Mean_Pack_Cost": "Cigarette Cost",
+    "Cost_Relative_To_Income": "Pack's per average Income",
     "Revenue_per_SAM": "Revenue per SAM",
     "SAM_per_Cancer_Death": "SAM per Cancer Death",
     "Revenue_per_Cancer_Death": "Revenue per Cancer Death"
@@ -507,21 +590,22 @@ def clear_selection():
 # The visualizations are placed in tabs so each section has a clear purpose.
 # 
 
-# In[ ]:
+# In[63]:
 
 
-tab_map, tab_bar, tab_scatter, tab_heatmap, tab_data = st.tabs(
+tab_map, tab_bar, tab_scatter, tab_heatmap, tab_time, tab_data = st.tabs(
     [
         "🗺️ Map",
         "📊 Bar Chart",
         "🔍 Scatter Plot",
         "🌡️ Correlation Heatmap",
+        "📈 Time Series",
         "📄 Data Tables"
     ]
 )
 
 
-# In[1]:
+# In[64]:
 
 
 with tab_map:
@@ -583,7 +667,7 @@ with tab_map:
         st.rerun()
 
 
-# In[ ]:
+# In[65]:
 
 
 with tab_bar:
@@ -643,7 +727,7 @@ with tab_bar:
     st.plotly_chart(fig_bar, width="stretch", theme=None)
 
 
-# In[ ]:
+# In[66]:
 
 
 with tab_scatter:
@@ -751,7 +835,7 @@ with tab_scatter:
         st.plotly_chart(fig_scatter, width="stretch")
 
 
-# In[ ]:
+# In[67]:
 
 
 with tab_heatmap:
@@ -808,7 +892,70 @@ with tab_heatmap:
     st.plotly_chart(fig_heatmap, width="stretch", theme=None)
 
 
-# In[ ]:
+# In[68]:
+
+
+with tab_time:
+    st.header("Time Series")
+    st.markdown(
+        "This line plot visualises change of certain metrics over time."
+    )
+    time_series_1 = income_relevant
+    time_series_2 = cost_relevant[['LocationDesc', 'Year', 'Data_Value']]
+    for col in year_cols:
+        time_series_1[col] = (time_series_1[col] - time_series_1[col].min()) / (time_series_1[col].max() - time_series_1[col].min())
+    time_series_2['Data_Value'] = (time_series_2['Data_Value'] - time_series_2['Data_Value'].min()) / (time_series_2['Data_Value'].max() - time_series_2['Data_Value'].min())
+
+    time_series_1  = time_series_1.melt(
+        id_vars=["State"],
+        var_name="Year",
+        value_name="Value"
+    )
+    time_series_1 = time_series_1.rename(columns={"State": "LocationDesc"})
+
+    time_series_1["Year"] = time_series_1["Year"].astype(int)
+    time_series_2["Year"] = time_series_2["Year"].astype(int)
+
+    time_series_1 = time_series_1.groupby("Year", as_index=False)["Value"].mean()
+    time_series_1 = time_series_1.rename(columns={"Value": "income_mean"})
+
+    time_series_2 = time_series_2.groupby("Year", as_index=False)["Data_Value"].mean()
+    time_series_2 = time_series_2.rename(columns={"Data_Value": "cost_mean"})
+
+    df_plot = time_series_1.merge(time_series_2, on="Year", how="inner")
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatter(
+        x=df_plot["Year"],
+        y=df_plot["income_mean"],
+        mode="lines+markers",
+        name="Mean income",
+        line=dict(color="royalblue")
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=df_plot["Year"],
+        y=df_plot["cost_mean"],
+        mode="lines+markers",
+        name="Mean cost of Cigarette",
+        line=dict(color="crimson")
+    ))
+
+    fig.update_layout(
+        title="Normalized Yearly Comparison of Income vs Cost of Cigarette",
+        xaxis_title="Year",
+        yaxis_title="Normalized Value"
+    )
+    fig.update_xaxes(
+        tickmode="linear",
+        dtick=1
+    )
+
+    st.plotly_chart(fig, width="stretch", theme=None)
+
+
+# In[69]:
 
 
 with tab_data:
@@ -830,7 +977,16 @@ with tab_data:
         st.markdown("State-level lung and respiratory cancer death data.")
         st.dataframe(cancer, width="stretch")
 
+    with st.expander("Cleaned income data"):
+        st.markdown("State-level average income data")
+        st.dataframe(income_avg, width="stretch")
+
+    with st.expander("Cleaned cost per package data"):
+        st.markdown("State-level average cost per cigarette package data")
+        st.dataframe(cost_avg, width="stretch")
+
     with st.expander("Final merged dataset"):
         st.markdown("Final merged dataset used to create the dashboard visualizations.")
         st.dataframe(final, width="stretch")
+
 
